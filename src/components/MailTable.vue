@@ -18,8 +18,8 @@
         <tbody>
         <tr
           :class="['mail-table__row', {'mail-table__row-read': email.read}]"
-          v-for="email in unArchivedEmails" :key="email.id"
-          @click="email.read = true"
+          v-for="(email, index) in unArchivedEmails" :key="email.id"
+          @click="openEmail(email, index)"
         >
           <td>
             <input type="checkbox">
@@ -37,22 +37,36 @@
       </table>
     </div>
   </div>
+  <mail-view
+    @PREV="() => changeEmail(-1)"
+    @NEXT="() => changeEmail(1)"
+    @update:email="openedEmailIndex = null"
+    :email="unArchivedEmails[openedEmailIndex]" v-if="openedEmailIndex !== null"/>
 </template>
 
 <script>
 import Format from 'date-fns/format'
 import {http} from "../http";
+import MailView from "./MailView.vue";
 
 export default {
   name: "MailTable",
+  components: {MailView},
   data() {
     return {
       loading: false,
-      emails: [
-      ]
+      emails: [],
+      openedEmailIndex: null
     }
   },
   methods: {
+    changeEmail(index) {
+      this.openedEmailIndex += index
+    },
+    openEmail(email, index) {
+      this.openedEmailIndex = index
+      email.read = true
+    },
     async getEmails() {
       try {
         this.loading = true
@@ -71,6 +85,9 @@ export default {
     }
   },
   computed: {
+    console() {
+      return console
+    },
     format() {
       return Format
     },
