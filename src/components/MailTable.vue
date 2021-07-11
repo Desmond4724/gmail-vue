@@ -1,6 +1,26 @@
 <template>
   <div class="container">
-    <h1>Gmail Inbox</h1>
+    <h1 class="mb-2">Gmail Inbox</h1>
+    <h1 class="mb-2" v-if="selectionEmails.length">{{ selectionEmails.length }} emails selected</h1>
+    <div class="d-flex justify-center mb-2">
+      <div class="px-1">
+        <button @click="toggleScreenView('inbox')" :class="['btn', {disabled: selectedScreenView === 'archived'}]">
+          Inbox
+        </button>
+      </div>
+      <div class="px-1">
+        <button @click="toggleScreenView('archived')" :class="['btn', {disabled: selectedScreenView === 'inbox'}]">
+          Archived
+        </button>
+      </div>
+    </div>
+    <bulk-action-bar
+      v-if="selectionEmails.length"
+      class="mb-2"
+      @updateEmail="updateEmail"
+      @clear="selectionEmails = []"
+      :emails="selectionEmails"
+    ></bulk-action-bar>
     <div class="card">
       <div class="linear-activity" v-if="loading">
         <div class="indeterminate"></div>
@@ -18,17 +38,21 @@
         <tbody>
         <tr
           :class="['mail-table__row', {'mail-table__row-read': email.read}]"
-          v-for="(email, index) in unArchivedEmails" :key="email.id"
+          v-for="(email, index) in viewEmails" :key="email.id"
           @click="openEmail(email, index)"
         >
           <td>
-            <input type="checkbox">
+            <input
+              class="mail-table__checkbox"
+              @click.stop="toggleCheckEmail(email)"
+              :checked="selectionEmails.includes(email)"
+              type="checkbox">
           </td>
-          <td>{{ email.from }}</td>
+          <td>{{ email.from_user }}</td>
           <td>
             <p><strong>{{ email.subject }}</strong></p>
           </td>
-          <td class="date">{{ format(new Date(email.sentAt), 'MMM do yy') }}</td>
+          <td class="date">{{ format(new Date(email.sent_at), 'MMM do yy') }}</td>
           <td>
             <button class="btn" @click="archiveEmail(email)">Archive</button>
           </td>
@@ -38,33 +62,59 @@
     </div>
   </div>
   <mail-view
-    @PREV="() => changeEmail(-1)"
-    @NEXT="() => changeEmail(1)"
+    @changeEmail="changeEmail"
     @update:email="openedEmailIndex = null"
-    :email="unArchivedEmails[openedEmailIndex]" v-if="openedEmailIndex !== null"/>
+    v-model:email="openedEmail" v-if="openedEmail"/>
 </template>
 
 <script>
 import Format from 'date-fns/format'
 import {http} from "../http";
 import MailView from "./MailView.vue";
+import BulkActionBar from "./BulkActionBar.vue";
 
 export default {
   name: "MailTable",
-  components: {MailView},
+  components: {BulkActionBar, MailView},
   data() {
     return {
       loading: false,
       emails: [],
-      openedEmailIndex: null
+      openedEmail: null,
+      selectionEmails: [],
+      selectedScreenView: 'archived'
     }
   },
   methods: {
-    changeEmail(index) {
-      this.openedEmailIndex += index
+    toggleScreenView(view) {
+      this.selectedScreenView = view
+      localStorage.setItem('view', view)
     },
-    openEmail(email, index) {
-      this.openedEmailIndex = index
+    toggleCheckEmail(email) {
+      const indexEmail = this.selectionEmails.indexOf(email)
+      if (indexEmail === -1) {
+        this.selectionEmails.push(email)
+      }
+      else {
+        this.selectionEmails.splice(indexEmail, 1)
+      }
+    },
+    changeEmail({toggleRead, toggleArchive, save, closeModal, changeIndex}) {
+      if (toggleRead) this.openedEmail.read = !this.openedEmail.read
+      if (toggleArchive) {
+        this.openedEmail.archived = !this.openedEmail.archived
+      }
+      if (save) this.updateEmail(this.openedEmail)
+      if (closeModal) this.openedEmail = null
+      if (typeof changeIndex !== 'undefined') {
+        const newEmailIndex = this.unArchivedEmails.indexOf(this.openedEmail) + changeIndex
+        if (this.unArchivedEmails[newEmailIndex]) {
+          this.openedEmail = this.unArchivedEmails[newEmailIndex]
+        }
+      }
+    },
+    openEmail(email) {
+      this.openedEmail = email
       email.read = true
     },
     async getEmails() {
@@ -72,6 +122,7 @@ export default {
         this.loading = true
         const {data: {data}} = await http.get('/emails')
         this.emails = data
+      } catch (e) {
       } finally {
         this.loading = false
       }
@@ -82,12 +133,9 @@ export default {
     },
     async updateEmail(email) {
       await http.put(`emails/${email.id}`, email)
-    }
+    },
   },
   computed: {
-    console() {
-      return console
-    },
     format() {
       return Format
     },
@@ -98,10 +146,20 @@ export default {
     },
     unArchivedEmails() {
       return this.sortedEmails.filter(e => !e.archived)
+    },
+    archivedEmails() {
+      return this.sortedEmails.filter(item => item.archived)
+    },
+    viewEmails() {
+      if (this.selectedScreenView === 'inbox') return this.unArchivedEmails
+      else if (this.selectedScreenView === 'archived') return this.archivedEmails
+      return []
     }
   },
   created() {
     this.getEmails()
+    const view = localStorage.getItem('view')
+    if (view) this.selectedScreenView = view
   }
 }
 </script>

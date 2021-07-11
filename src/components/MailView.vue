@@ -12,14 +12,14 @@
           <button @click="toggleRead(email)" class="btn">{{ `Mark ${email.read ? 'unread' : 'read'} (r)` }}</button>
         </div>
         <div class="px-1">
-          <button @click="goNewer" class="btn">Newer</button>
+          <button @click="goNewer" class="btn">Newer(n)</button>
         </div>
         <div class="px-1">
-          <button @click="goOlder" class="btn">Older</button>
+          <button @click="goOlder" class="btn">Older(o)</button>
         </div>
       </div>
       <h2 class="mail-view__title">Subject: <strong>{{ email.subject }}</strong></h2>
-      <div class="mail-view__desc"><em>From: {{ email.from }} on {{ format(new Date(email.sentAt), 'MMM do yy') }}</em>
+      <div class="mail-view__desc"><em>From: {{ email.from_user }} on {{ format(new Date(email.sent_at), 'MMM do yy') }}</em>
       </div>
       <div>{{ email.body }}</div>
     </div>
@@ -42,21 +42,16 @@ export default {
   },
   methods: {
     goNewer() {
-      this.$emit('NEXT')
+      this.$emit('changeEmail', {changeIndex: 1})
     },
     goOlder() {
-      this.$emit('PREV')
+      this.$emit('changeEmail', {changeIndex: -1})
     },
     toggleArchive() {
-      this.email.archived = !this.email.archived
-      this.updateEmail(this.email)
-    },
-    async updateEmail(email) {
-      await http.put(`/emails/${this.email.id}`, email)
+      this.$emit('changeEmail', {toggleArchive: true, save: true, closeModal: true})
     },
     toggleRead() {
-      this.email.read = !this.email.read
-      this.updateEmail(this.email)
+      this.$emit('changeEmail', {toggleRead: true, save: true})
     },
     closeModal() {
       this.$emit('update:email', null)
